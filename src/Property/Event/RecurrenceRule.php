@@ -78,48 +78,92 @@ class RecurrenceRule implements ValueInterface
     protected $bySetPos = null;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byMonth;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byWeekNo;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byYearDay;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byMonthDay;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byDay;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byHour;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $byMinute;
 
     /**
-     * @var null|string
+     * @var null|array
      */
     protected $bySecond;
 
     public function getEscapedValue(): string
     {
         return $this->buildParameterBag()->toString();
+    }
+
+    /**
+     * @return array|null
+     */
+    protected function buildIntArray($value, $ruleName, $minValue, $maxValue, $canBeZero = false) {
+        if (null === $value) {
+            return null;
+        }
+        
+        $invalidValueTypeMessage = 'Invalid value for ' . $ruleName;
+
+        if (!(is_string($value) || is_array($value) || is_int($value))) {
+            throw new \InvalidArgumentException($invalidValueTypeMessage);
+        }
+
+        $list = $value;
+
+        if (is_int($value)) {
+            $list = [$value];
+        }
+
+        if (is_string($value)) {
+            $list = explode(',', $value);
+        }
+
+        $output = [];
+
+        foreach ($list as $item) {
+            if (is_string($item)) {
+                if (!preg_match('/^ *-?[0-9]* *$/', $item)) {
+                    throw new \InvalidArgumentException($invalidValueTypeMessage);
+                }
+                $item = intval($item);
+            }
+
+            if (!is_int($item) || $item < $minValue || (!$canBeZero && $item === 0) || $item > $maxValue) {
+                throw new \InvalidArgumentException($invalidValueTypeMessage);
+            }
+
+            $output[] = $item;
+        }
+
+        return $output;
     }
 
     /**
@@ -147,40 +191,48 @@ class RecurrenceRule implements ValueInterface
             $parameterBag->setParam('WKST', $this->wkst);
         }
 
-        if (null !== $this->bySetPos && $this->canUseBySetPos) {
-            $parameterBag->setParam('BYSETPOS', $this->bySetPos);
-        }
-
         if (null !== $this->byMonth) {
-            $parameterBag->setParam('BYMONTH', explode(',', $this->byMonth));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYMONTH', $this->byMonth);
         }
 
         if (null !== $this->byWeekNo) {
-            $parameterBag->setParam('BYWEEKNO', explode(',', $this->byWeekNo));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYWEEKNO', $this->byWeekNo);
         }
 
         if (null !== $this->byYearDay) {
-            $parameterBag->setParam('BYYEARDAY', explode(',', $this->byYearDay));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYYEARDAY', $this->byYearDay);
         }
 
         if (null !== $this->byMonthDay) {
-            $parameterBag->setParam('BYMONTHDAY', explode(',', $this->byMonthDay));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYMONTHDAY', $this->byMonthDay);
         }
 
         if (null !== $this->byDay) {
-            $parameterBag->setParam('BYDAY', explode(',', $this->byDay));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYDAY', $this->byDay);
         }
 
         if (null !== $this->byHour) {
-            $parameterBag->setParam('BYHOUR', explode(',', $this->byHour));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYHOUR', $this->byHour);
         }
 
         if (null !== $this->byMinute) {
-            $parameterBag->setParam('BYMINUTE', explode(',', $this->byMinute));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYMINUTE', $this->byMinute);
         }
 
         if (null !== $this->bySecond) {
-            $parameterBag->setParam('BYSECOND', explode(',', $this->bySecond));
+            $this->canUseBySetPos = true;
+            $parameterBag->setParam('BYSECOND', $this->bySecond);
+        }
+
+        if (null !== $this->bySetPos && $this->canUseBySetPos) {
+            $parameterBag->setParam('BYSETPOS', $this->bySetPos);
         }
 
         return $parameterBag;
@@ -318,49 +370,11 @@ class RecurrenceRule implements ValueInterface
      */
     public function setBySetPos($value)
     {
-        if (null === $value) {
-            $this->bySetPos = value;
-
-            return $this;
+        try {
+            $this->bySetPos = $this->buildIntArray($value, 'BYSETPOS', -366, 366);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
         }
-
-        if (!(is_string($value) || is_array($value) || is_int($value))) {
-            throw new InvalidArgumentException('Invalid value for BYSETPOS');
-        }
-
-        $list = $value;
-
-        if (is_int($value)) {
-            if ($value === 0 || $value < -366 || $value > 366) {
-                throw new InvalidArgumentException('Invalid value for BYSETPOS');
-            }
-            $this->bySetPos = [$value];
-
-            return $this;
-        }
-
-        if (is_string($value)) {
-            $list = explode(',', $value);
-        }
-
-        $output = [];
-
-        foreach ($list as $item) {
-            if (is_string($item)) {
-                if (!preg_match('/^ *-?[0-9]* *$/', $item)) {
-                    throw new InvalidArgumentException('Invalid value for BYSETPOS');
-                }
-                $item = intval($item);
-            }
-
-            if (!is_int($item) || $item === 0 || $item < -366 || $item > 366) {
-                throw new InvalidArgumentException('Invalid value for BYSETPOS');
-            }
-
-            $output[] = $item;
-        }
-
-        $this->bySetPos = $output;
 
         return $this;
     }
@@ -369,21 +383,19 @@ class RecurrenceRule implements ValueInterface
      * The BYMONTH rule part specifies a COMMA-separated list of months of the year.
      * Valid values are 1 to 12.
      *
-     * @param int $month
+     * @param null|int|string|array $value
      *
      * @throws InvalidArgumentException
      *
      * @return $this
      */
-    public function setByMonth($month)
+    public function setByMonth($value)
     {
-        if (!is_integer($month) || $month < 0 || $month > 12) {
-            throw new InvalidArgumentException('Invalid value for BYMONTH');
+        try {
+            $this->byMonth = $this->buildIntArray($value, 'BYMONTH', 1, 12);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
         }
-
-        $this->byMonth = $month;
-
-        $this->canUseBySetPos = true;
 
         return $this;
     }
@@ -392,15 +404,19 @@ class RecurrenceRule implements ValueInterface
      * The BYWEEKNO rule part specifies a COMMA-separated list of ordinals specifying weeks of the year.
      * Valid values are 1 to 53 or -53 to -1.
      *
-     * @param int $value
+     * @param null|int|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
      */
     public function setByWeekNo($value)
     {
-        $this->byWeekNo = $value;
-
-        $this->canUseBySetPos = true;
+        try {
+            $this->byWeekNo = $this->buildIntArray($value, 'BYWEEKNO', -53, 53);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
+        }
 
         return $this;
     }
@@ -409,15 +425,19 @@ class RecurrenceRule implements ValueInterface
      * The BYYEARDAY rule part specifies a COMMA-separated list of days of the year.
      * Valid values are 1 to 366 or -366 to -1.
      *
-     * @param int $day
+     * @param null|int|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
      */
-    public function setByYearDay($day)
+    public function setByYearDay($value)
     {
-        $this->byYearDay = $day;
-
-        $this->canUseBySetPos = true;
+        try {
+            $this->byYearDay = $this->buildIntArray($value, 'BYYEARDAY', -366, 366);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
+        }
 
         return $this;
     }
@@ -426,15 +446,19 @@ class RecurrenceRule implements ValueInterface
      * The BYMONTHDAY rule part specifies a COMMA-separated list of days of the month.
      * Valid values are 1 to 31 or -31 to -1.
      *
-     * @param int $day
+     * @param null|int|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
      */
-    public function setByMonthDay($day)
+    public function setByMonthDay($value)
     {
-        $this->byMonthDay = $day;
-
-        $this->canUseBySetPos = true;
+        try {
+            $this->byMonthDay = $this->buildIntArray($value, 'BYMONTHDAY', -31, 31);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
+        }
 
         return $this;
     }
@@ -448,15 +472,52 @@ class RecurrenceRule implements ValueInterface
      * Each BYDAY value can also be preceded by a positive (+n) or negative (-n) integer.
      * If present, this indicates the nth occurrence of a specific day within the MONTHLY or YEARLY "RRULE".
      *
-     * @param string $day
+     * @param null|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
      */
-    public function setByDay(string $day)
+    public function setByDay(string $value)
     {
-        $this->byDay = $day;
+        if (null === $value) {
+            $this->byDay = null;
+            return $this;
+        }
 
-        $this->canUseBySetPos = true;
+        $output = [];
+
+        if (!is_string($value) && !is_array($value)) {
+            throw new \InvalidArgumentException('Invalid value for BYDAY');
+        }
+
+        if (is_string($value)) {
+            $items = explode(',', $value);
+        }
+        else {
+            $items = $value;
+        }
+
+        foreach ($items as $item) {
+            if (!is_string($item)) {
+                throw new \InvalidArgumentException('Invalid value for BYDAY');
+            }
+
+            $item = strtoupper(trim($item));
+
+            if (preg_match('/^(SU|MO|TU|WE|TH|FR|SA)$/', $item)) {
+                $output[] = $item;
+                continue;
+            }
+
+            if (!preg_match('/^[-+]?[0-9]*(SU|MO|TU|WE|TH|FR|SA)$/', $item)) {
+                throw new \InvalidArgumentException('Invalid value for BYDAY');
+            }
+
+            $output[] = $item;
+        }
+
+        $this->byDay = $output;
 
         return $this;
     }
@@ -465,21 +526,19 @@ class RecurrenceRule implements ValueInterface
      * The BYHOUR rule part specifies a COMMA-separated list of hours of the day.
      * Valid values are 0 to 23.
      *
-     * @param int $value
+     * @param null|int|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
-     *
-     * @throws \InvalidArgumentException
      */
     public function setByHour($value)
     {
-        if (!is_integer($value) || $value < 0 || $value > 23) {
-            throw new \InvalidArgumentException('Invalid value for BYHOUR');
+        try {
+            $this->byHour = $this->buildIntArray($value, 'BYHOUR', 0, 23, true);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
         }
-
-        $this->byHour = $value;
-
-        $this->canUseBySetPos = true;
 
         return $this;
     }
@@ -488,21 +547,19 @@ class RecurrenceRule implements ValueInterface
      * The BYMINUTE rule part specifies a COMMA-separated list of minutes within an hour.
      * Valid values are 0 to 59.
      *
-     * @param int $value
+     * @param null|int|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
-     *
-     * @throws \InvalidArgumentException
      */
     public function setByMinute($value)
     {
-        if (!is_integer($value) || $value < 0 || $value > 59) {
-            throw new \InvalidArgumentException('Invalid value for BYMINUTE');
+        try {
+            $this->byMinute = $this->buildIntArray($value, 'BYMINUTE', 0, 59, true);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
         }
-
-        $this->byMinute = $value;
-
-        $this->canUseBySetPos = true;
 
         return $this;
     }
@@ -511,21 +568,19 @@ class RecurrenceRule implements ValueInterface
      * The BYSECOND rule part specifies a COMMA-separated list of seconds within a minute.
      * Valid values are 0 to 60.
      *
-     * @param int $value
+     * @param null|int|string|array $value
+     *
+     * @throws InvalidArgumentException
      *
      * @return $this
-     *
-     * @throws \InvalidArgumentException
      */
     public function setBySecond($value)
     {
-        if (!is_integer($value) || $value < 0 || $value > 60) {
-            throw new \InvalidArgumentException('Invalid value for BYSECOND');
+        try {
+            $this->bySecond = $this->buildIntArray($value, 'BYSECOND', 0, 60, true);
+        } catch(\InvalidArgumentException $exception) {
+            throw new \InvalidArgumentException($exception->getMessage());
         }
-
-        $this->bySecond = $value;
-
-        $this->canUseBySetPos = true;
 
         return $this;
     }
